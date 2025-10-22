@@ -1,0 +1,2365 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Player</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <style>
+        :root {
+            --primary-bg: #f4f6f9;
+            --secondary-bg: #ffffff;
+            --text-color: #212529;
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8; /* MÀU MỚI */
+            --border-radius: 8px;
+            --box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+            margin: 0;
+            padding: 15px;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background-color: var(--secondary-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            overflow-y: auto;
+            max-height: 95vh;
+        }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        h1, h2, h3 { text-align: center; color: var(--primary-color); }
+        textarea, input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: var(--border-radius);
+            box-sizing: border-box;
+            margin-bottom: 15px;
+        }
+        textarea { height: 250px; overflow-y: auto; }
+        .button-group { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 20px; }
+        .btn {
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            background-color: var(--primary-color);
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            text-align: center;
+            transition: background-color 0.2s;
+            text-decoration: none; /* Cho thẻ <a> */
+            display: inline-block; /* Cho thẻ <a> */
+        }
+        .btn:hover { background-color: #0056b3; }
+        .btn-secondary { background-color: var(--secondary-color); }
+        .btn-secondary:hover { background-color: #5a6268; }
+        .btn-danger { background-color: var(--danger-color); }
+        .btn-danger:hover { background-color: #c82333; }
+        .btn-warning { background-color: var(--warning-color); }
+        .btn-warning:hover { background-color: #e0a800; }
+        .btn-success { background-color: var(--success-color); }
+        .btn-success:hover { background-color: #218838; }
+        .btn-info { background-color: var(--info-color); }
+        .btn-info:hover { background-color: #138496; }
+
+        .output-box {
+            background-color: #fdfdfd; border-radius: 8px; padding: 15px;
+            border: 1px solid #eee; margin-top: 10px; min-height: 300px;
+        }
+        #visual-review-output { font-size: 16px; white-space: pre-wrap; word-wrap: break-word; line-height: 1.8; }
+        .legend {
+            border: 1px solid #ccc; padding: 10px; border-radius: 8px;
+            margin-top: 20px; display: flex; flex-wrap: wrap; gap: 15px; justify-content: center;
+        }
+        .legend-item { display: flex; align-items: center; font-size: 14px; }
+        .legend-color { width: 20px; height: 20px; border: 1px solid #999; margin-right: 8px; }
+        .ignored { background-color: #ffcccc; }
+        .question { background-color: #ff9933; color: black; padding: 1px 3px; border-radius: 3px;}
+        .correct-answer { background-color: #28a745; color: white; padding: 1px 3px; border-radius: 3px;}
+        .incorrect-answer { background-color: #ffd700; color: black; padding: 1px 3px; border-radius: 3px;}
+        .question-chunk {
+            display: block; border: 1px dotted #ccc;
+            padding: 10px; margin-bottom: 10px; border-radius: 4px;
+        }
+
+        .warning-collapsed {
+            padding: 10px 15px;
+            background-color: var(--warning-color);
+            color: #333;
+            border-radius: var(--border-radius);
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: background-color 0.2s;
+        }
+        .warning-collapsed:hover {
+            background-color: #e0a800;
+        }
+        .warning-details {
+            border: 2px solid var(--danger-color);
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #fff5f5;
+            margin-bottom: 20px;
+        }
+        .question-container { margin-bottom: 25px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
+        .options-container label { display: block; margin-bottom: 10px; padding: 8px; border-radius: 5px; cursor: pointer; transition: background-color 0.2s; }
+        .options-container label:hover { background-color: #f0f0f0; }
+        .question-text { font-size: 18px; margin-bottom: 5px; font-weight: bold; }
+        .sidebar { width: 260px; max-height: 80vh; overflow-y: auto; position: fixed; top: 0; left: 0; height: 100%; background-color: var(--secondary-bg); box-shadow: var(--box-shadow); transition: transform 0.3s ease; }
+        .pill-container { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; }
+        .main-content { transition: all 0.3s ease; padding: 15px; }
+        .with-sidebar { margin-left: 260px; width: calc(100% - 260px); }
+        .full { margin-left: 0; width: 100%; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 1000; }
+        .modal-content { background-color: var(--secondary-bg); margin: 5% auto; padding: 20px; border-radius: var(--border-radius); width: 95%; max-width: 800px; max-height: 90vh; overflow-y: auto; box-shadow: var(--box-shadow); position: relative; }
+        #statisticsModal .modal-content { max-width: 500px; }
+        .modal-content.large-search-open { margin-top: 0.5%; padding-top: 150px; }
+        .comparison-question { margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #ccc; }
+        .comparison-question:last-of-type { border-bottom: none; }
+        .comparison-question-text { margin-bottom: 15px; white-space: pre-wrap; }
+        .options-comparison-wrapper { display: flex; flex-direction: row; gap: 15px; }
+        .options-column { flex: 1; min-width: 48%; border: 1px solid #e0e0e0; border-radius: var(--border-radius); padding: 10px; background-color: #fdfdfd; }
+        .options-column h5 { margin-top: 0; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px; font-size: 16px; }
+        .option-item { padding: 4px; margin: 3px 0; border-radius: 4px; }
+        #comparison-menu-btn { position: fixed; top: 20px; right: 20px; width: 40px; height: 40px; background-color: var(--primary-color); border-radius: 50%; cursor: pointer; z-index: 1002; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        #comparison-menu-btn .bar { width: 20px; height: 2px; background-color: white; transition: all 0.3s; }
+        .search-menu { background-color: #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.2); z-index: 1001; box-sizing: border-box; position: absolute; }
+        .search-menu h4 { margin-top: 0; color: var(--primary-color); }
+        .search-menu .input-group { margin-bottom: 15px; display: flex; align-items: center; }
+        .search-menu .input-group label { width: 60px; }
+        .search-menu input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .search-menu .icon-btn { background: none; border: none; cursor: pointer; font-size: 24px; }
+        .search-menu .clear-btn { border: 1px solid #ccc; border-radius: 4px; padding: 2px 8px; cursor: pointer; }
+        #small-search-menu { top: 65px; right: 20px; width: 300px; height: auto; padding: 15px; border-radius: var(--border-radius); transform-origin: top right; transition: transform 0.2s ease-out, opacity 0.2s; transform: scale(0.95); opacity: 0; pointer-events: none; }
+        #small-search-menu.open { transform: scale(1); opacity: 1; pointer-events: auto; }
+        #large-search-menu { top: 0; left: 0; width: 100%; height: auto; display: flex; flex-direction: column; padding: 15px 65px 15px 15px; border-bottom: 1px solid #eee; transition: transform 0.3s ease-in-out; transform: translateY(-110%); }
+        #large-search-menu.open { transform: translateY(0); }
+        #large-search-menu .search-controls { display: flex; width: 100%; gap: 10px; align-items: center; margin-top: 45px; }
+        #large-search-menu .input-group { flex: 1; margin-bottom: 0; }
+        #large-search-results { font-weight: bold; color: var(--success-color); margin-top: 10px; }
+        .nav-buttons { display: flex; justify-content: center; gap: 10px; margin-top: 10px; }
+        mark { background-color: #ffc107; padding: 0 2px; }
+        .fixed-btn { position: fixed; bottom: 30px; right: 30px; padding: 15px 25px; font-size: 18px; font-weight: bold; color: white; background-color: var(--success-color); border: none; border-radius: 50px; cursor: pointer; text-align: center; transition: all 0.3s; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 999; }
+        .fixed-btn:hover { background-color: #218838; transform: scale(1.05); }
+        #comparison-help-btn { position: fixed; top: 20px; left: 20px; width: 40px; height: 40px; background-color: var(--secondary-color); border-radius: 50%; cursor: pointer; z-index: 1002; display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        #helpModal .modal-content ul { list-style-type: none; padding: 0; }
+        #helpModal .modal-content li { margin-bottom: 15px; line-height: 1.6; }
+        #helpModal .modal-content .icon { display: inline-block; width: 20px; text-align: center; margin-right: 10px; }
+        #statistics-legend { margin-top: 15px; font-size: 16px; line-height: 1.6; text-align: center; border-top: 1px solid #eee; padding-top: 15px; }
+        #statistics-chart { min-height: 300px; color: #333; }
+        .user-greeting { text-align: center; margin-bottom: 20px; font-size: 1.1em; color: var(--secondary-color); }
+        #sync-status {
+            text-align: center; padding: 8px; font-size: 14px; color: white;
+            position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+            border-radius: 8px 8px 0 0; z-index: 2000; display: none;
+            transition: opacity 0.5s;
+        }
+        #sync-status.syncing { background-color: var(--info-color); }
+        #sync-status.success { background-color: var(--success-color); }
+        #sync-status.error { background-color: var(--danger-color); }
+    </style>
+
+    <!-- ================================================================== -->
+    <!-- =================== KHAI BÁO FIREBASE SDK ======================== -->
+    <!-- ================================================================== -->
+    <script type="module">
+        // Import các hàm cần thiết từ Firebase SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getDatabase, ref, get, set, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
+
+        // Cấu hình Firebase của bạn
+        const firebaseConfig = {
+            apiKey: "AIzaSyAnt9ctszFdlVIwdX9KDS4hpvyfglclJQ0",
+            authDomain: "quizzz-de3f6.firebaseapp.com",
+            projectId: "quizzz-de3f6",
+            storageBucket: "quizzz-de3f6.appspot.com",
+            messagingSenderId: "775849270363",
+            appId: "1:775849270363:web:f2871cab3227d93f88737e",
+            databaseURL: "https://quizzz-de3f6-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+
+        // Khởi tạo Firebase và export để script chính có thể dùng
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Đưa các hàm cần thiết vào scope global để script bên dưới có thể truy cập
+        window.firebaseSDK = {
+            ref,
+            get,
+            set,
+            serverTimestamp,
+            db
+        };
+    </script>
+    <!-- ================================================================== -->
+
+</head>
+<body class="bg-gray-100">
+    <div id="sync-status"></div>
+    <div id="loading-screen" class="modal" style="display: none; justify-content: center; align-items: center; background-color: rgba(0, 0, 0, 0.3);">
+        <div style="background: white; padding: 25px 50px; border-radius: 10px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.2);">
+            <h3 style="margin-top: 0;">Đang xử lý...</h3>
+            <p>Vui lòng đợi trong giây lát.</p>
+        </div>
+    </div>
+    <div class="container">
+        <div id="login-screen" class="screen">
+            <h1>Chào mừng!</h1>
+            <p style="text-align: center; margin-bottom: 20px;">Vui lòng nhập tên của bạn để bắt đầu.</p>
+            <input type="text" id="username-input" placeholder="Nhập tên của bạn...">
+            <div class="button-group">
+                <button id="login-btn" class="btn">Vào Menu Chính</button>
+            </div>
+        </div>
+
+        <!-- MÀN HÌNH CHÍNH (ĐÃ ĐƯỢC NÂNG CẤP) -->
+        <div id="home-screen" class="screen">
+            <h1>Quiz Player</h1>
+            <p id="user-greeting" class="user-greeting"></p>
+            <div class="button-group">
+                <button class="btn btn-success" onclick="showScreen('pre-quiz-menu-screen')">Bắt đầu làm bài</button>
+                <a href="./bangxephang.html" target="_blank" class="btn btn-info">Xem Bảng Xếp Hạng</a>
+                <button class="btn btn-secondary" onclick="showScreen('history-list-screen')">Xem Lịch Sử Làm Bài</button>
+            </div>
+        </div>
+
+        <!-- MÀN HÌNH MENU LÀM BÀI -->
+        <div id="pre-quiz-menu-screen" class="screen">
+            <h2>Tùy chọn làm bài</h2>
+            <div class="button-group">
+                <button id="menu-shuffle-btn" class="btn">Trộn câu hỏi và đáp án: Tắt</button>
+                <button id="menu-start-btn" class="btn btn-success">Bắt Đầu</button>
+                <button id="menu-back-btn" class="btn btn-secondary" onclick="showScreen('home-screen')">Quay Lại</button>
+            </div>
+        </div>
+
+        <div id="history-list-screen" class="screen">
+            <div id="history-sidebar" class="sidebar">
+                <div class="p-4 font-bold">📜 Lịch Sử Làm Bài</div>
+                <div id="history-list" class="pill-container"></div>
+                <button class="btn btn-secondary m-2" onclick="showScreen('home-screen')">Về Trang Chủ</button>
+            </div>
+            <div id="history-mainContent" class="main-content with-sidebar">
+                <h1 class="text-2xl font-bold mb-4">Danh sách lịch sử làm bài</h1>
+                <p class="text-gray-600">👉 Vuốt sang trái để ẩn sidebar, vuốt sang phải để mở lại.</p>
+                <div id="history-questionBox" class="mt-6 p-4 bg-white rounded-xl shadow max-w-md hidden text-left space-y-4"></div>
+            </div>
+            <div id="history-contentModal" class="modal">
+                <div id="history-contentModalContent" class="modal-content">
+                    <h3 id="history-modalTitle"></h3>
+                    <div id="history-modalContent"></div>
+                    <div class="button-group mt-4">
+                        <button class="btn btn-secondary" onclick="closeHistoryModal()">Quay lại</button>
+                        <button class="btn btn-danger" id="deleteHistoryBtn">Xóa</button>
+                    </div>
+                </div>
+            </div>
+            <div id="statisticsModal" class="modal">
+                <div class="modal-content">
+                    <button id="statistics-close-btn" style="position: absolute; top: 15px; right: 15px; width: 30px; height: 30px; border: none; background: #eee; border-radius: 50%; font-weight: bold; cursor: pointer;">X</button>
+                    <h3 id="statistics-modalTitle" style="text-align: center;">Thống kê kết quả</h3>
+                    <div id="statistics-content">
+                        <div id="statistics-chart"></div>
+                        <div id="statistics-legend"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="comparisonModal" class="modal">
+                <div class="modal-content">
+                    <button id="comparison-help-btn" style="display: none;">?</button>
+                    <div id="comparison-menu-btn" style="display: none;">
+                        <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                    </div>
+                    <h3 id="comparison-modalTitle"></h3>
+                    <div id="comparison-content"></div>
+                    <div class="button-group mt-4">
+                        <button class="btn btn-secondary" onclick="closeComparisonModal()">Quay lại</button>
+                    </div>
+                </div>
+                <div id="small-search-menu" class="search-menu">
+                    <h4>Tìm Câu Nhanh</h4>
+                    <div class="input-group">
+                        <label for="dao-input">Đảo</label>
+                        <input type="number" id="dao-input" placeholder="Số đã đảo...">
+                    </div>
+                    <div class="input-group">
+                        <label for="thuan-input">Thuận</label>
+                        <input type="number" id="thuan-input" placeholder="Số gốc...">
+                    </div>
+                    <div class="input-group" style="justify-content: flex-end; margin-bottom: 0;">
+                        <span class="clear-btn" id="clear-small-search">xóa</span>
+                        <button class="icon-btn" id="exec-small-search">🔎</button>
+                    </div>
+                </div>
+                <div id="large-search-menu" class="search-menu">
+                    <div class="search-controls">
+                        <span class="clear-btn" id="clear-large-search">xóa</span>
+                        <div class="input-group">
+                           <input type="text" id="large-search-input" placeholder="Nhập nội dung cần tìm...">
+                        </div>
+                        <button class="icon-btn" id="exec-large-search">🔎</button>
+                    </div>
+                     <div id="large-search-results"></div>
+                    <div class="nav-buttons">
+                        <button class="btn btn-secondary" id="prev-match-btn">Quay lại</button>
+                        <button class="btn btn-secondary" id="next-match-btn">Kế tiếp</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="quiz-section" class="screen">
+            <h2 id="quiz-title">Nội dung bài thi</h2>
+            <div id="quiz-live-container"></div>
+            <div id="results-container" style="display:none;">
+                <h2>Kết Quả</h2>
+                <p id="final-score"></p>
+            </div>
+            <div class="button-group">
+                <button id="start-btn" class="btn" style="display:none;"></button>
+                <button id="shuffle-btn" class="btn" style="display:none;">Trộn câu hỏi và đáp án: Tắt</button>
+                <button id="submit-early-btn" class="btn btn-warning" style="display:none;">Nộp Bài Sớm</button>
+                 <button class="btn btn-danger" onclick="showScreen('home-screen')">Thoát</button>
+            </div>
+        </div>
+        <button id="startQuizBtn" class="fixed-btn" style="display:none;">Bắt Đầu Làm Bài</button>
+    </div>
+    <div id="helpModal" class="modal">
+        <div class="modal-content">
+            <h3>Trợ giúp & Hướng dẫn</h3>
+            <ul>
+                <li><span class="icon">🎨</span><strong>Màu nền giống nhau:</strong> Các đáp án có cùng màu nền ở cột "gốc" và cột "xáo trộn" là cùng một đáp án.</li>
+                 <li><span class="icon" style="color: var(--success-color); font-weight: bold;">■</span><strong style="color: var(--success-color);">Chữ Xanh Lá & In Đậm:</strong> Là đáp án đúng mà bạn đã chọn đúng.</li>
+                 <li><span class="icon" style="color: var(--success-color);">■</span><span style="color: var(--success-color); text-decoration: underline;">Chữ Xanh Lá & Gạch chân:</span> Là đáp án đúng bạn đã bỏ sót.</li>
+                 <li><span class="icon" style="color: var(--danger-color);">■</span><strong style="color: var(--danger-color);">Chữ Đỏ:</strong> Là đáp án sai mà bạn đã chọn.</li>
+                 <li><span class="icon">☰</span><strong>Menu tìm kiếm (góc trên bên phải):</strong>
+                    <ul style="margin-left: 30px; margin-top: 10px; list-style-type: disc;">
+                        <li><strong>Nhấn nhanh:</strong> Mở menu tìm kiếm nhanh theo số thứ tự câu hỏi.</li>
+                        <li><strong>Nhấn giữ:</strong> Mở thanh tìm kiếm lớn ở trên cùng để tìm theo nội dung.</li>
+                    </ul>
+                </li>
+            </ul>
+            <div class="button-group">
+                <button class="btn btn-secondary" onclick="document.getElementById('helpModal').style.display='none'">Đã hiểu</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ==================================================================
+        // =================== KHU VỰC DỮ LIỆU BÀI THI =====================
+        //
+        //   DÁN MẢNG JSON CÂU HỎI CỦA BẠN VÀO BÊN TRONG DẤU NGOẶC VUÔNG [].
+        //
+        // ==================================================================
+        const EMBEDDED_QUIZ_DATA = [
+  {
+    "cau_hoi": "Câu 1. Nội dung nào sau đây không phản ánh đúng mục tiêu của Đảng về Chiến lược bảo vệ Tổ quốc Việt Nam xã hội chủ nghĩa trong tình hình mới?",
+    "lua_chon": [
+      "*A.Kết hợp chặt chẽ hai nhiệm vụ: xây dựng và bảo vệ Tổ quốc xã hội chủ nghĩa.",
+      "B. Bảo vệ vững chắc độc lập, chủ quyền, thống nhất, toàn vẹn lãnh thổ của Tổ quốc.",
+      "C. Giữ vững môi trường hòa bình, ổn định chính trị, an ninh quốc gia, an ninh con người.",
+      "D. Bảo vệ Đảng, Nhà nước, nhân dân, chế độ xã hội chủ nghĩa, văn hóa, lợi ích quốc gia."
+    ],
+    "dap_an_dung": [
+      "*A.Kết hợp chặt chẽ hai nhiệm vụ: xây dựng và bảo vệ Tổ quốc xã hội chủ nghĩa."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 2. Một trong những quan điểm chỉ đạo của Đảng về Chiến lược bảo vệ Tổ quốc Việt Nam xã hội chủ nghĩa trong tình hình mới là.",
+    "lua_chon": [
+      "A.\tCoi ngoại lực là nhân tố quyết định mọi thắng lợi, thành công.",
+      "*B. Kiên định mục tiêu độc lập dân tộc gắn liền với chủ nghĩa xã hội.",
+      "C. Chỉ chú trọng xây dựng sức mạnh của đất nước về văn hóa – xã hội.",
+      "D. Kết hợp chặt chẽ hai nhiệm vụ chiến lược: kháng chiến và kiến quốc."
+    ],
+    "dap_an_dung": [
+      "*B. Kiên định mục tiêu độc lập dân tộc gắn liền với chủ nghĩa xã hội."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 3: Những ai tôn trọng động lập chủ quyền, thiết lập và mở rộng quan hệ hữu nghị, hợp tác bình đẳng,cùng có lợi với VN đều là.",
+    "lua_chon": [
+      "*A. đối tác.",
+      "B. đối tượng.",
+      "C. kẻ thù.",
+      "D. đối thủ"
+    ],
+    "dap_an_dung": [
+      "*A. đối tác."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 4. Công ước của Liên hợp quốc về Luật Biển năm 1982 bao gồm.",
+    "lua_chon": [
+      "*A. 320 điều và 9 phụ lục.",
+      "B. 7 chương với 55 điều.",
+      "C. 9 chương với 62 điều.",
+      "D. 36 điều và 8 phụ lục."
+    ],
+    "dap_an_dung": [
+      "*A. 320 điều và 9 phụ lục."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 5. Theo quy định trong Luật Biển Việt Nam năm 2012, vùng biển Việt Nam gồm bao nhiêu bộ phận?",
+    "lua_chon": [
+      "A. 3 bộ phận.",
+      "B. 4 bộ phận.",
+      "*C. 5 bộ phận.",
+      "D. 6 bộ phận."
+    ],
+    "dap_an_dung": [
+      "*C. 5 bộ phận."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 6. Vùng nước tiếp giáp với bờ biển, ở phía trong đường cơ sở được gọi là:",
+    "lua_chon": [
+      "*A. Nội thủy.",
+      "B. Lãnh hải.",
+      "C. Vùng tiếp giáp lãnh hải.",
+      "D. Thềm lục địa."
+    ],
+    "dap_an_dung": [
+      "*A. Nội thủy."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 7. Vùng biên tiếp liền và nằm ngoài lãnh hải Việt Nam, có chiều rộng 12 hải lí tính từ ranh giới ngoài của lãnh hải, được gọi là.",
+    "lua_chon": [
+      "A. Nội thủy.",
+      "*B. Vùng tiếp giáp lãnh hải.",
+      "C. Vùng đặc quyền kinh tế.",
+      "D. Thềm lục địa."
+    ],
+    "dap_an_dung": [
+      "*B. Vùng tiếp giáp lãnh hải."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 8. Vùng đáy biển và lòng đất dưới đáy biển, tiếp liền và nằm ngoài lãnh hải Việt Nam, trên toàn bộ phần kéo dài tự nhiên của lãnh thổ đất liền, các đảo và quần đảo của Việt Nam cho đến mép ngoài của rìa lục địa, được gọi là.",
+    "lua_chon": [
+      "A. Nội thủy.",
+      "*D. Thềm da lục địa.",
+      "B. Vùng tiếp giáp lãnh hải.",
+      "C. Vùng đặc quyền kinh tế."
+    ],
+    "dap_an_dung": [
+      "*D. Thềm da lục địa."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 9. “Vùng đất tự nhiên có nước bao bọc, khi thuỷ triều lên vùng đất này vẫn ở trên mặt nước” - đó là nội dung của khái niệm nào sau đây?",
+    "lua_chon": [
+      "C. Nội thủy.",
+      "D. Lãnh hải.",
+      "*A. Đảo.",
+      "B. Quần đảo."
+    ],
+    "dap_an_dung": [
+      "*A. Đảo."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 10. Nước Cộng hòa xã hội chủ nghĩa Việt Nam là một nước độc lập, có chủ quyền, thống nhất và toàn vẹn lãnh thổ, bao gồm:",
+    "lua_chon": [
+      "B. Vùng biển và vùng trời.",
+      "A. Đất liền và hải đảo.",
+      "C. Vùng đất vùng trời và hải đảo.",
+      "*D. Đất liền, hải đảo, vùng biển và vùng trời."
+    ],
+    "dap_an_dung": [
+      "*D. Đất liền, hải đảo, vùng biển và vùng trời."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 11. Biên giới quốc gia trên biển được hoạch định và đánh dấu bằng .",
+    "lua_chon": [
+      "A. Hệ tọa độ trên đất liền.",
+      "C. Hệ thống mốc quốc giới.",
+      "*B. Các tọa độ trên hải đồ.",
+      "D. Một mốc quốc giới duy nhất."
+    ],
+    "dap_an_dung": [
+      "*B. Các tọa độ trên hải đồ."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 12. “Mặt thẳng đứng từ biên giới quốc gia trên đất liền và biên giới quốc gia trên biển lên vùng trời” đó là nội dung của khái niệm nào sau đây?",
+    "lua_chon": [
+      "A. Biên giới quốc gia trên biển.",
+      "*B. Biên giới quốc gia trên không.",
+      "C. Biên giới quốc gia trên đất liền.",
+      "D. Biên giới quốc gia trong lòng đất."
+    ],
+    "dap_an_dung": [
+      "*B. Biên giới quốc gia trên không."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 13. Trong bảo vệ biên giới quốc gia của Việt Nam, pháp luật Việt Nam không nghiêm cấm thực hiện hành vi nào sau đây?",
+    "lua_chon": [
+      "A. Làm sai lệch, chệch hướng đi của đường biên giới quốc gia.",
+      "B. Vận chuyển qua biên giới quốc gia các văn hoá phẩm độc hại.",
+      "*C. Bảo vệ môi trường, tài nguyên thiên nhiên và lợi ích quốc gia.",
+      "D. Xâm canh, xâm cư; phá hoại công trình ở khu vực biên giới."
+    ],
+    "dap_an_dung": [
+      "*C. Bảo vệ môi trường, tài nguyên thiên nhiên và lợi ích quốc gia."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 14. Ngày 03 tháng 3 hằng năm là ngày truyền thống của lực lượng nào sau đây?",
+    "lua_chon": [
+      "*A. Bộ đội Biên phòng Việt Nam.",
+      "C. Công an nhân dân Việt Nam.",
+      "B. Quân đội nhân dân Việt Nam.",
+      "D. Hải quân nhân dân Việt Nam."
+    ],
+    "dap_an_dung": [
+      "*A. Bộ đội Biên phòng Việt Nam."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 15. Việt Nam có đường biên giới chung trên đất liền với những quốc gia nào?",
+    "lua_chon": [
+      "B. Mianma, Malaixia, Inđônêxia.",
+      "A. Lào, Thái Lan, Philíppin.",
+      "*D. Trung Quốc, Lào, Campuchia.",
+      "C. Lào, Campuchia, Thái Lan."
+    ],
+    "dap_an_dung": [
+      "*D. Trung Quốc, Lào, Campuchia."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 1. Đối tượng đăng kí nghĩa vụ quân sự gồm.",
+    "lua_chon": [
+      "*A. công dân nam đủ 17 tuổi trở lên; công dân nữ đủ 18 tuổi trở lên.",
+      "B. công dân nam đủ 18 tuổi trở lên; công dân nữ đủ 17 tuổi trở lên.",
+      "C. công dân nam đủ 21 tuổi trở lên; công dân nữ đủ 22 tuổi trở lên.",
+      "D. công dân nam đủ 22 tuổi trở lên; công dân nữ đủ 23 tuổi trở lên."
+    ],
+    "dap_an_dung": [
+      "*A. công dân nam đủ 17 tuổi trở lên; công dân nữ đủ 18 tuổi trở lên."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 2. Chỉ huy trưởng Ban chỉ huy quân sự cấp huyện ra lệnh gọi công dân đăng kí nghĩa vụ quân sự đầu vào thời gian nào?",
+    "lua_chon": [
+      "A. Tháng ba hằng năm.",
+      "*B. Tháng tư hằng năm.",
+      "C. Tháng năm hằng năm.",
+      "D. Tháng sáu hằng năm."
+    ],
+    "dap_an_dung": [
+      "*B. Tháng tư hằng năm."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 3: Công dân trực tiếp đăng ký nghĩa vụ quân sự tại.",
+    "lua_chon": [
+      "D. mang sau mang nam.",
+      "*A. Ban Chỉ huy quân sự cấp xã.",
+      "C. Ban Chỉ huy quân sự câp huyện."
+    ],
+    "dap_an_dung": [
+      "*A. Ban Chỉ huy quân sự cấp xã."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 4. Ở Việt Nam, công dân được đào tạo trình độ cao đẳng  đại học đã được tạm hoãn gọi nhập ngũ đến hết .",
+    "lua_chon": [
+      "A. 25 tuổi.",
+      "*B. 27 tuổi.",
+      "C. 29 tuổi.",
+      "D. 31 tuổi."
+    ],
+    "dap_an_dung": [
+      "*B. 27 tuổi."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 5. Công dân thuộc diện gọi nhập ngũ được gọi khám sức khỏe. Thời gian khám sức khỏe từ ngày.",
+    "lua_chon": [
+      "*A. 01 tháng 11 đến hết ngày 31 tháng 12 hằng năm.",
+      "B. 01 tháng 1 đến hết ngày 28 tháng 2 hằng năm.",
+      "C. 01 tháng 3 đến hết ngày 30 tháng 4 hằng năm.",
+      "D. 01 tháng 5 đến hết ngày 30 tháng 6 hằng năm."
+    ],
+    "dap_an_dung": [
+      "*A. 01 tháng 11 đến hết ngày 31 tháng 12 hằng năm."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 6. Công dân thuộc trường hợp nào sau đây được tạm hoãn gọi nhập ngũ?",
+    "lua_chon": [
+      "*A . Đang được đào tạo trình độ đại học hệ chính quy thuộc cơ sở giáo dục đại học.",
+      "B. Đủ sức khỏe phục vụ tại ngũ theo kết luận của Hội đồng khám sức khỏe.",
+      "C. Có anh, chị hoặc em họ là hạ sĩ quan, binh sĩ đang phục vụ tại ngũ.",
+      "D. Có người thân bị suy giảm khả năng lao động từ 40 đến 60%."
+    ],
+    "dap_an_dung": [
+      "*A . Đang được đào tạo trình độ đại học hệ chính quy thuộc cơ sở giáo dục đại học."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 7. Công dân thuộc trường hợp nào sau đây được công nhận hoàn thành nghĩa vụ quân sự tại ngũ trong thời bình?",
+    "lua_chon": [
+      "*A. Dân quân thường trực có ít nhất 24 tháng phục vụ.",
+      "B. Tham gia Công an xã liên tục từ đủ 24 tháng trở lên.",
+      "C. Phục vụ trên tàu kiểm ngư từ đủ 36 tháng trở lên.",
+      "D. Phục vụ trên tàu kiểm ngư từ đủ 12 tháng trở lên."
+    ],
+    "dap_an_dung": [
+      "*A. Dân quân thường trực có ít nhất 24 tháng phục vụ."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 8. Ở thời bình, trong trường hợp để bảo đảm nhiệm vụ sẵn sàng chiến đấu hoặc đang thực hiện nhiệm vụ phòng, chống thiên tai, dịch bệnh, cứu hộ, cứu nạn,... thời hạn tại ngũ của hạ sĩ quan, binh lính được kéo dài nhưng không quá.",
+    "lua_chon": [
+      "A. 24 tháng.",
+      "B. 18 tháng.",
+      "C. 12 tháng.",
+      "*D. 6 tháng."
+    ],
+    "dap_an_dung": [
+      "*D. 6 tháng."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 9. Hành vi không đăng kí nghĩa vụ quân sự lần đầu sẽ bị xử phạt bằng hình thức nào sau đây?",
+    "lua_chon": [
+      "A. Cải tạo không giam giữ.",
+      "B. Tù không thời hạn.",
+      "C. Tù có thời hạn.",
+      "*D. Phạt tiền."
+    ],
+    "dap_an_dung": [
+      "*D. Phạt tiền."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 10. Đối tượng được tuyển chọn thực hiện nghĩa vụ tham gia công an nhân dân là: công dân nam.",
+    "lua_chon": [
+      "*A. trong độ tuổi gọi nhập ngũ đã đăng kí nghĩa vụ quân sự.",
+      "B. ngoài độ tuổi gọi nhập ngũ đã hoàn thành nghĩa vụ quân sự.",
+      "C. từ 18 đến hết 27 tuổi, thuộc trường hợp miễn gọi nhập ngũ.",
+      "D. từ 18 đến hết 45 tuổi, thuộc trường hợp tạm hoãn gọi nhập ngũ."
+    ],
+    "dap_an_dung": [
+      "*A. trong độ tuổi gọi nhập ngũ đã đăng kí nghĩa vụ quân sự."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 11. Công dân có trách nhiệm gì trong thực hiện nghĩa vụ quân sự?",
+    "lua_chon": [
+      "A. Không chấp hành lệnh gọi kiểm tra, khám sức khỏe nghĩa vụ quân sự.",
+      "B. Cố ý không nhận lệnh gọi kiểm tra, khám sức khỏe nghĩa vụ quân sự.",
+      "C. Làm sai lệch kết quả phân loại sức khỏe nhằm trốn tránh nghĩa vụ quân sự.",
+      "*D. Chấp hành quy định của pháp luật về đăng kí và thực hiện nghĩa vụ quân sự."
+    ],
+    "dap_an_dung": [
+      "*D. Chấp hành quy định của pháp luật về đăng kí và thực hiện nghĩa vụ quân sự."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 12. Công dân được công nhận hoàn thành nghĩa vụ quân sự tại ngũ trong thời bình khi có thời gian phục vụ trên tàu kiêm ngư từ đủ.",
+    "lua_chon": [
+      "A. 12 tháng trở lên.",
+      "B. 18 tháng trở lên.",
+      "*C. 24 tháng trở lên.",
+      "D. 30 tháng trở lên."
+    ],
+    "dap_an_dung": [
+      "*C. 24 tháng trở lên."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 1. Nội dung nào sau đây không phản ánh đúng về khái niệm “tội phạm”?",
+    "lua_chon": [
+      "A. Do pháp nhân thương mại thực hiện một cách vô ý hoặc cố ý.",
+      "B. Do người mất năng lực trách nhiệm hình sự thực hiện một cách cố ý.",
+      "C. Là hành vi nguy hiểm cho xã hội được quy định trong Bộ luật Hình sự.",
+      "D . Do người có năng lực trách nhiệm hình sự thực hiện một cách vô ý hoặc cố ý."
+    ],
+    "dap_an_dung": [
+      "*C. Là hành vi nguy hiểm cho xã hội được quy định trong Bộ luật Hình sự."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 2. Trong Bộ luật Hình sự năm 2015, sửa đổi, bổ sung năm 2017 có bao nhiêu chương quy định về hình phạt các tội phạm?",
+    "lua_chon": [
+      "A. 12 chương.",
+      "B. 13 chương.",
+      "*C. 14 chương.",
+      "D. 15 chương."
+    ],
+    "dap_an_dung": [
+      "*C. 14 chương."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 3: Nội dung nào sau đây không phản ánh đúng những cách thức hoạt động phổ biến của tội phạm?",
+    "lua_chon": [
+      "A. Câu kết thành các băng nhóm tổ chức.",
+      "B. Chỉ lưu động trên phạm vi xã, phường.",
+      "*C. Sử dụng thủ đoạn giả mạo, gian dối.",
+      "D. Sử dụng vũ khí, công cụ, phương tiện."
+    ],
+    "dap_an_dung": [
+      "*C. Sử dụng thủ đoạn giả mạo, gian dối."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 4. Tội phạm sử dụng công nghệ cao là những hành vi vi phạm.",
+    "lua_chon": [
+      "*A. pháp luật hình sự.",
+      "B. pháp luật dân sự.",
+      "C. pháp luật lao động.",
+      "D. pháp luật tô tụng."
+    ],
+    "dap_an_dung": [
+      "*A. pháp luật hình sự."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 5. Hành vi sản xuất, mua bán, trao đổi hoặc tặng cho công cụ, thiết bị, phần mềm để sử dụng vào mục đích trái pháp luật sẽ bị xử phạt theo những hình thức nào?",
+    "lua_chon": [
+      "A. Cảnh cáo hoặc phạt tiền.",
+      "B. Cảnh cáo, phạt tiền và phạt tử hình.",
+      "C. Cải tạo không giam giữ hoặc cảnh cáo.",
+      "*D. Phạt tiền, phạt cải tạo không giam giữ hoặc phạt tù."
+    ],
+    "dap_an_dung": [
+      "*D. Phạt tiền, phạt cải tạo không giam giữ hoặc phạt tù."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 6. Điền cụm từ thích hợp vào chỗ trống (....) trong khái niệm sau đây: “.. là hiện tượng xã hội tiêu cực, có tính phổ biến, lan truyền, biểu hiện bằng những hành vi vi phạm pháp luật, lệch chuẩn mực xã hội, chuẩn mực đạo đức, gây nguy hiểm cho xã hội”?",
+    "lua_chon": [
+      "*A. Tệ nạn xã hội.",
+      "C. Bạo lực học đường.",
+      "B. Bạo lực gia đình.",
+      "D. Tội phạm hình sự."
+    ],
+    "dap_an_dung": [
+      "*A. Tệ nạn xã hội."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 7. Tệ nạn mại dâm là các hành vi.",
+    "lua_chon": [
+      "A. sử dụng trái phép chất ma tuý, nghiện ma tuý, vi phạm pháp luật về ma tuý.",
+      "*B. mua dâm, bán dâm và các hành vi khác có liên quan đến mua dâm, bán dâm.",
+      "C. tin vào những điều mơ hồ dẫn đến cuồng tín, hành động trái với chuẩn mực xã hội.",
+      "D. lợi dụng trò chơi để cá cược, sát phạt được thua bằng tiền hoặc lợi ích vật chất khác."
+    ],
+    "dap_an_dung": [
+      "*B. mua dâm, bán dâm và các hành vi khác có liên quan đến mua dâm, bán dâm."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 8. Tệ nạn cờ bạc là các hành vi.",
+    "lua_chon": [
+      "A. sử dụng trái phép chất ma tuý, nghiện ma tuý, vi phạm pháp luật về ma tuý.",
+      "B. mua dâm, bán dâm và các hành vi khác có liên quan đến mua dâm, bán dâm.",
+      "C. tin vào những điều mơ hồ dẫn đến cuồng tín, hành động trái với chuẩn mực xã hội.",
+      "*D. lợi dụng trò chơi để cá cược, sát phạt được thua bằng tiền hoặc lợi ích vật chất khác."
+    ],
+    "dap_an_dung": [
+      "*D. lợi dụng trò chơi để cá cược, sát phạt được thua bằng tiền hoặc lợi ích vật chất khác."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 9. Câu ca dao “Bạc ba quan tha hồ mở bát/ Cháo ba đồng chê đắt không ăn” phản ánh về loại tệ nạn xã hội nào dưới đây?",
+    "lua_chon": [
+      "*B. Tệ nạn cờ bạc.",
+      "A. Tệ nạn ma túy.",
+      "D. Tệ nạn mê tín dị đoan.",
+      "C. Tệ nạn mại dâm."
+    ],
+    "dap_an_dung": [
+      "*B. Tệ nạn cờ bạc."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 10. Câu tục ngữ nào sau đây phản ánh về tệ nạn mê tín dị đoan?",
+    "lua_chon": [
+      "A. Đánh đề ra đê mà ở.",
+      "*B. Bói ra ma, quét nhà ra rác.",
+      "C. Đi cuốc đau tay, đi cày mỏi gối.",
+      "D. Nhịn đói năm co hơn ăn no vác nặng."
+    ],
+    "dap_an_dung": [
+      "*B. Bói ra ma, quét nhà ra rác."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 11. Trong dịp Tết Nguyên đán, P rủ mấy bạn đến nhà đánh tú lơ khơ ăn tiền. Nếu nhận được lời mời của P, em nên lựa chọn cách ứng xử nào sau đây?",
+    "lua_chon": [
+      "A. Lập tức đồng ý đến nhà P chơi đánh bài ăn tiền.",
+      "B. Từ chối nhưng vẫn đến nhà P để xem các bạn chơi.",
+      "*C. Từ chối và khuyên P không nên thực hiện hành vi đó.",
+      "D. Đồng ý và rủ thêm các bạn khác cùng tham gia cho vui."
+    ],
+    "dap_an_dung": [
+      "*C. Từ chối và khuyên P không nên thực hiện hành vi đó."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 12. Xử phạt vi phạm hành chính đối với cá nhân, tổ chức có hành vi.",
+    "lua_chon": [
+      "*A. tham gia hoặc tổ chức hoạt động mê tín dị đoan trong lễ hội.",
+      "B. dùng bói toán để thu lợi bất chính từ 200 triệu đồng trở lên.",
+      "C. dùng bói toán, đồng bóng gây ảnh hưởng xấu đến an toàn xã hội.",
+      "D. sử dụng các hình thức mê tín dị đoan dẫn đến chết người."
+    ],
+    "dap_an_dung": [
+      "*A. tham gia hoặc tổ chức hoạt động mê tín dị đoan trong lễ hội."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 13. Pháp luật Việt Nam không nghiêm cấm thực hiện hành vi nào sau đây?",
+    "lua_chon": [
+      "A. Mua dâm; bán dâm và tổ chức hoạt động mại dâm.",
+      "*B. Tố giác hành vi: mua dâm, bán dâm, chứa mại dâm.",
+      "C. Lợi dụng kinh doanh dịch vụ để hoạt động mại dâm.",
+      "D. Cưỡng bức, môi giới mại dâm và bảo kê mại dâm."
+    ],
+    "dap_an_dung": [
+      "*B. Tố giác hành vi: mua dâm, bán dâm, chứa mại dâm."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 14. Nội dung nào sau đây không phản ánh đúng trách nhiệm của học sinh trong việc phòng chống tệ nạn xã hội?",
+    "lua_chon": [
+      "A. Học tập đầy đủ các nội dung giáo dục về phòng, chống tệ nạn xã hội.",
+      "B. Tự giác thực hiện trách nhiệm công dân trong phòng, chống tệ nạn xã hội.",
+      "C. Gương mẫu thực hiện quy định của pháp luật, quy tắc sinh hoạt cộng đồng.",
+      "*D. Không tham gia hoạt động phòng chống tệ nạn xã hội do địa phương tổ chức."
+    ],
+    "dap_an_dung": [
+      "*D. Không tham gia hoạt động phòng chống tệ nạn xã hội do địa phương tổ chức."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": ". Câu 15. Chủ thể nào dưới đây không vi phạm pháp luật về phòng, chống tệ nạn xã hội?",
+    "lua_chon": [
+      "*A. Chị V tố cáo với cơ quan công an về hành vi tổ chức đánh bạc của ông P.",
+      "B. Anh K lợi dụng việc kinh doanh dịch vụ massage để môi giới mại dâm.",
+      "C. Bạn K vận chuyển giúp ông C 200g ma túy để nhận 1 triệu đồng tiền công.",
+      "D. Bà S tung tin mình được “thánh cho ăn lộc” để tổ chức hoạt động bói toán."
+    ],
+    "dap_an_dung": [
+      "*A. Chị V tố cáo với cơ quan công an về hành vi tổ chức đánh bạc của ông P."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 1. Điền cụm từ thích hợp vào chỗ trống (......) trong khái niệm sau đây: “...... vật chất tự nhiên và nhân tạo quan hệ mật thiết với nhau, bao quanh con người, có ảnh hưởng đến đời sống,kinh tế, xã hội, sự tồn tại, phát triển của con người, sinh vật và tự nhiên”.",
+    "lua_chon": [
+      "*A. Môi trường.",
+      "B. Không khí.",
+      "C. Sinh vật.",
+      "D. Hệ sinh thái."
+    ],
+    "dap_an_dung": [
+      "*A. Môi trường."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 2. Yếu tố vật chất nào dưới đây không phải là thành phần của môi trường tự nhiên?",
+    "lua_chon": [
+      "A. Không khí.",
+      "B. Sinh vật.",
+      "C. Ánh sáng.",
+      "*D. Dân cư."
+    ],
+    "dap_an_dung": [
+      "*D. Dân cư."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 3: “ Sự biến đổi tính chất vật lý, hóa học, sinh học của thành phần môi trường không phù hợp với quy chuẩn kĩ thuật môi trường gây ảnh hưởng xấu đến sức khỏe con người, sinh vật tự nhiên” – là nội dung của khái niệm nào?",
+    "lua_chon": [
+      "A. Bảo vệ môi trường",
+      "*B. Ô nhiễm môi trường.",
+      "C. An ninh môi trường.",
+      "D. Biến đổi khí hậu."
+    ],
+    "dap_an_dung": [
+      "*B. Ô nhiễm môi trường."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 4. Nội dung nào sau đây không phản ánh đúng ý nghĩa của môi trường?",
+    "lua_chon": [
+      "A. Cung cấp tài nguyên cần thiết cho cuộc sống và sản xuất của con người.",
+      "B. Chứa đựng các chất phế thải do con người tạo ra trong sản xuất và cuộc sống.",
+      "*C. Là không gian sống và là nơi cung cấp, lưu trữ thông tin của riêng loài người.",
+      "D. Là nơi lưu giữ lịch sử tiến hoá của con người, các loài sinh vật và Trái Đất."
+    ],
+    "dap_an_dung": [
+      "*C. Là không gian sống và là nơi cung cấp, lưu trữ thông tin của riêng loài người."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 5. Điền cụm từ thích hợp vào chỗ trống (......) trong khái niệm sau đây: “. tố cấu thành môi trường cân bằng để bảo đảm điều kiện sống và phát triển của con người cùng các loài sinh là hệ thống các loài sinh vật trong hệ thống đó.",
+    "lua_chon": [
+      "A. Bảo vệ môi trường.",
+      "*C. An ninh môi trường.",
+      "D. Biến đổi khí hậu.",
+      "B. Ô nhiễm môi trường."
+    ],
+    "dap_an_dung": [
+      "*C. An ninh môi trường."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 6. “Sự thay đổi của khí hậu chủ yếu do hoạt động của con người làm thay đổi thành phần khí quyền toàn cầu và sự thay đổi này làm tăng khả năng biến động tự nhiên của khí hậu” - đó là nội dung của khái niệm nào sau đây?",
+    "lua_chon": [
+      "A. Bảo vệ môi trường.",
+      "B. Ô nhiễm môi trường.",
+      "C. An ninh môi trường.",
+      "*D. Biến đổi khí hậu."
+    ],
+    "dap_an_dung": [
+      "*D. Biến đổi khí hậu."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 7. Nội dung nào sau đây không phản ánh đúng biểu hiện của biến đổi khí hậu?",
+    "lua_chon": [
+      "A. Mực nước biển dâng cao",
+      "B. Lượng mưa thay đổi thất thường.",
+      "C. Nhiệt độ trung bình toàn cầu tăng cao.",
+      "*D. Giảm các hiện tượng thời tiết cực đoan ."
+    ],
+    "dap_an_dung": [
+      "*D. Giảm các hiện tượng thời tiết cực đoan ."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 8. Vấn đề nào dưới đây không liên quan đến an ninh môi trường?",
+    "lua_chon": [
+      "A. Thiên tai.",
+      "B. Dịch bệnh.",
+      "*C. An ninh thông tin.",
+      "D. An ninh lương thực."
+    ],
+    "dap_an_dung": [
+      "*C. An ninh thông tin."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 9. Nội dung nào sau đây không phản ánh đúng các tác nhân tiêu cực dẫn đến việc di cư tự do?",
+    "lua_chon": [
+      "A. Đất canh tác bị ô nhiễm, suy thoái.",
+      "*B. Môi trường không khí trong lành.",
+      "C. Tài nguyên suy giảm, cạn kiệt.",
+      "D. Hệ sinh bị phá hủy."
+    ],
+    "dap_an_dung": [
+      "*B. Môi trường không khí trong lành."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 10. Bảo vệ môi trường không bao gồm hoạt động nào sau đây?",
+    "lua_chon": [
+      "A. Cải thiện chất lượng môi trường.",
+      "B. Ứng phó với các sự cố môi trường.",
+      "C. Khắc phục ô nhiễm, suy thoái môi trường.",
+      "*D. Khai thác cạn kiệt tài nguyên thiên nhiên."
+    ],
+    "dap_an_dung": [
+      "*D. Khai thác cạn kiệt tài nguyên thiên nhiên."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  },
+  {
+    "cau_hoi": "Câu 11. Để bảo vệ môi trường đất, chúng ta không nên thực hiện biện pháp nào sau đây?",
+    "lua_chon": [
+      "*A. Lạm dụng thuốc bảo vệ thực vật và phân bón hóa học trong sản xuất.",
+      "B. Nâng cao ý thức trách nhiệm bảo vệ môi trường đất của cộng đồng cư dân.",
+      "C. Nhà nước tiến hành cải tạo, phục hồi môi trường đất ở các khu vực ô nhiễm.",
+      "D. Xem xét tác động và có giải pháp phòng ngừa ô nhiễm trước khi quy hoạch."
+    ],
+    "dap_an_dung": [
+      "*A. Lạm dụng thuốc bảo vệ thực vật và phân bón hóa học trong sản xuất."
+    ],
+    "type": "multiple_choice",
+    "hasLineMarker": false,
+    "blockType": "trắc"
+  }
+] ;
+
+
+        // ==================================================================
+        // =================== CẤU HÌNH HỆ THỐNG ==========================
+        // ==================================================================
+        // ĐÃ XÓA BIẾN GOOGLE_SHEET_WEB_APP_URL
+        // ==================================================================
+
+        const optionMarkerRegex = /(?<=(?:^|\n|\t|[*.?]\s*))\*?\s*[A-Za-z]{1,2}[.)]/g;
+        const optionPrefixRegex = /^\s*\*?\s*[A-Za-z]{1,2}[.)]/;
+        
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        const pillColorConfig = {
+            baseClasses: 'px-4 py-2 rounded-full text-white font-semibold shadow-md transition-transform transform hover:scale-105',
+            selectedClasses: 'bg-gray-500 hover:bg-gray-600',
+            colors: [
+                { name: 'blue', classes: 'bg-blue-500 hover:bg-blue-600' },
+                { name: 'green', classes: 'bg-green-500 hover:bg-green-600' },
+                { name: 'purple', classes: 'bg-purple-500 hover:bg-purple-600' }
+            ]
+        };
+
+        let appState = {
+            currentUser: '', 
+            playerID: '', // <-- THÊM MỚI: Quản lý PlayerID
+            currentQuiz: [],
+            quizTopic: '',
+            originalQuizOrder: [],
+            shuffledQuizMap: [],
+            shuffledOptionsMap: [],
+            currentQuestionIndex: 0,
+            score: 0,
+            isShuffled: false,
+            userAnswers: [],
+            currentModalHistory: null,
+            isQuizStarted: false,
+            quizStartTime: null,
+            currentScreen: null, 
+            lastScreen: null,
+            isPopping: false
+        };
+
+        const APEX_LIB_KEY = 'apexChartsLibraryCode_v2';
+        const APEX_CDN_URL = 'https://cdn.jsdelivr.net/npm/apexcharts';
+        
+        const DOCX_LIB_KEY = 'docxLibraryCode_v8.5.0';
+        const DOCX_CDN_URL = 'https://unpkg.com/docx@8.5.0/build/index.js';
+
+        function injectScript(scriptText, callback) {
+            const scriptElement = document.createElement('script');
+            scriptElement.textContent = scriptText;
+            document.head.appendChild(scriptElement);
+            setTimeout(callback, 100); 
+        }
+
+        async function ensureLibraryIsLoaded(libKey, cdnUrl, checkVar, callback) {
+             if (typeof window[checkVar] !== 'undefined') {
+                callback();
+                return;
+            }
+
+            const cachedScript = localStorage.getItem(libKey);
+            if (cachedScript) {
+                injectScript(cachedScript, callback);
+            } else {
+                try {
+                    const response = await fetch(cdnUrl);
+                    if (!response.ok) throw new Error(`Network response was not ok: ${response.status}`);
+                    const scriptText = await response.text();
+                    
+                    try {
+                        localStorage.setItem(libKey, scriptText);
+                    } catch (e) {
+                        console.warn(`Could not cache ${checkVar} library: ${e.message}`);
+                    }
+                    
+                    injectScript(scriptText, callback);
+                } catch (error) {
+                    console.error(`Failed to fetch ${checkVar}:`, error);
+                    alert(`Tải thư viện ${checkVar} thất bại. Vui lòng kiểm tra kết nối Internet và thử lại.`);
+                }
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            initEventListeners();
+            initIndexedDB();
+            checkLogin();
+            initComparisonMenuListeners(); 
+            initHelpModalListeners();
+            syncResultsWithFirebase(); // <-- THAY ĐỔI: Gọi hàm đồng bộ Firebase
+        });
+
+        function checkLogin() {
+            const savedUser = localStorage.getItem('quizAppUser');
+            const savedPlayerID = localStorage.getItem('quizAppPlayerID'); // <-- THÊM MỚI
+            if (savedUser && savedPlayerID) { // <-- THÊM MỚI
+                appState.currentUser = savedUser;
+                appState.playerID = savedPlayerID; // <-- THÊM MỚI
+                document.getElementById('user-greeting').textContent = `Xin chào, ${appState.currentUser}!`;
+                showScreen('home-screen');
+            } else {
+                showScreen('login-screen');
+            }
+        }
+
+        function initHelpModalListeners() {
+            document.getElementById('comparison-help-btn').addEventListener('click', () => {
+                document.getElementById('helpModal').style.display = 'block';
+            });
+        }
+        
+        function initEventListeners() {
+            window.addEventListener('online', syncResultsWithFirebase); // <-- THAY ĐỔI
+            document.getElementById('login-btn').addEventListener('click', () => {
+                const username = document.getElementById('username-input').value.trim();
+                if (username) {
+                    appState.currentUser = username;
+                    localStorage.setItem('quizAppUser', username);
+
+                    // TẠO VÀ LƯU PLAYERID
+                    let playerID = localStorage.getItem('quizAppPlayerID');
+                    if (!playerID) {
+                        playerID = `${username.replace(/\s/g, '')}-${Date.now()}`; // Tạo ID duy nhất
+                        localStorage.setItem('quizAppPlayerID', playerID);
+                    }
+                    appState.playerID = playerID;
+                    
+                    document.getElementById('user-greeting').textContent = `Xin chào, ${appState.currentUser}!`;
+                    showScreen('home-screen');
+                } else {
+                    alert('Vui lòng nhập tên của bạn.');
+                }
+            });
+
+            document.getElementById('start-btn').addEventListener('click', startQuiz);
+            document.getElementById('shuffle-btn').addEventListener('click', toggleShuffle);
+            document.getElementById('submit-early-btn').addEventListener('click', submitEarly);
+            document.getElementById('deleteHistoryBtn').addEventListener('click', deleteHistoryFromModal);
+            
+            document.getElementById('menu-shuffle-btn').addEventListener('click', toggleShuffle);
+            document.getElementById('menu-start-btn').addEventListener('click', startQuizFromMenu);
+
+            let startX = 0;
+            document.addEventListener("touchstart", (e) => {
+                startX = e.touches[0].clientX;
+            });
+            document.addEventListener("touchend", (e) => {
+                const endX = e.changedTouches[0].clientX;
+                const diff = endX - startX;
+                const activeScreen = document.querySelector('.screen.active');
+                if (!activeScreen) return;
+                
+                if (activeScreen.id === 'history-list-screen') {
+                    if (diff < -50 && historySidebarVisible) toggleHistorySidebar(false);
+                    if (diff > 50 && !historySidebarVisible) toggleHistorySidebar(true);
+                }
+            });
+            window.onpopstate = handlePopState;
+        }
+
+        function showScreen(screenId) {
+            if (appState.currentScreen === screenId) return;
+
+            if (appState.currentScreen === 'history-list-screen') {
+                closeHistoryModal();
+                closeComparisonModal();
+                const statsModal = document.getElementById('statisticsModal');
+                if (statsModal) statsModal.style.display = 'none';
+            }
+
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            
+            const targetScreenElement = document.getElementById(screenId);
+            if (targetScreenElement) {
+                 targetScreenElement.classList.add('active');
+            } else {
+                console.error(`Lỗi: Không tìm thấy màn hình với ID: ${screenId}`);
+                document.getElementById('login-screen').classList.add('active');
+                screenId = 'login-screen';
+            }
+           
+            appState.lastScreen = appState.currentScreen;
+            appState.currentScreen = screenId;
+
+            if (screenId === 'home-screen') {
+                appState.currentQuiz = [];
+                appState.isQuizStarted = false;
+                appState.userAnswers = [];
+                appState.score = 0;
+                appState.currentQuestionIndex = 0;
+            } else if (screenId === 'history-list-screen') {
+                renderHistoryList();
+                toggleHistorySidebar(true);
+            }
+            
+            if (!appState.isPopping && history.state?.screen !== screenId) {
+                history.pushState({ screen: screenId }, '');
+            }
+        }
+        function handlePopState(event) {
+            appState.isPopping = true;
+            if (appState.isQuizStarted) {
+                if (confirm('Bạn có muốn quay lại không? Nếu có sẽ coi như nộp bài sớm.')) {
+                    showResults();
+                    showScreen('home-screen');
+                    history.replaceState({ screen: 'home-screen' }, '');
+                } else {
+                    history.pushState({ screen: 'quiz-section' }, '');
+                }
+            } else {
+                const targetScreen = event.state && event.state.screen ? event.state.screen : 'login-screen';
+                showScreen(targetScreen);
+            }
+            appState.isPopping = false;
+        }
+        
+        function prepareQuizUI(questions, doShowScreen = true, topic = 'Bài thi') {
+            appState.quizTopic = topic;
+            appState.currentQuiz = questions;
+            appState.originalQuizOrder = [...questions];
+            if (doShowScreen) {
+                showScreen('quiz-section');
+            }
+            document.getElementById('quiz-title').textContent = topic;
+            document.getElementById('quiz-live-container').innerHTML = '';
+            document.getElementById('results-container').style.display = 'none';
+            const startBtn = document.getElementById('start-btn');
+            startBtn.style.display = 'inline-block';
+            startBtn.textContent = 'Bắt Đầu';
+            const shuffleBtn = document.getElementById('shuffle-btn');
+            shuffleBtn.style.display = 'inline-block';
+            shuffleBtn.textContent = `Trộn câu hỏi và đáp án: ${appState.isShuffled ? 'Bật' : 'Tắt'}`;
+            document.getElementById('submit-early-btn').style.display = 'none';
+        }
+
+        function startQuizFromMenu() {
+            if (EMBEDDED_QUIZ_DATA.length === 0) {
+                alert("Chưa có dữ liệu bài thi. Vui lòng thêm câu hỏi vào biến EMBEDDED_QUIZ_DATA.");
+                return;
+            }
+            prepareQuizUI(EMBEDDED_QUIZ_DATA, true, "Bài kiểm tra tổng hợp");
+            startQuiz();
+        }
+
+        function startQuiz() {
+            appState.score = 0;
+            appState.currentQuestionIndex = 0;
+            appState.userAnswers = [];
+            appState.isQuizStarted = true;
+            appState.quizStartTime = Date.now();
+            appState.shuffledQuizMap = [];
+            appState.shuffledOptionsMap = [];
+            if (appState.isShuffled) {
+                let indices = Array.from({length: appState.currentQuiz.length}, (_, i) => i);
+                indices.sort(() => Math.random() - 0.5);
+                appState.shuffledQuizMap = indices;
+                appState.currentQuiz = indices.map(i => ({...appState.originalQuizOrder[i]}));
+            } else {
+                appState.currentQuiz = [...appState.originalQuizOrder];
+            }
+            document.getElementById('start-btn').style.display = 'none';
+            document.getElementById('shuffle-btn').style.display = 'none';
+            document.getElementById('submit-early-btn').style.display = 'inline-block';
+            displayQuestion();
+        }
+
+        function displayQuestion() {
+            const container = document.getElementById('quiz-live-container');
+            if (appState.currentQuestionIndex >= appState.currentQuiz.length) {
+                showResults();
+                return;
+            }
+            const q = appState.currentQuiz[appState.currentQuestionIndex];
+            let optionsToDisplay = [...q.lua_chon];
+
+            if (appState.isShuffled && (q.type === 'multiple_choice' || q.type === 'multiple_answer')) {
+                 if (q.hasLineMarker) {
+                    let optionObjects = q.lua_chon.map((opt, index) => ({ text: opt, originalIndex: index }));
+                    optionObjects.sort(() => Math.random() - 0.5);
+                    optionsToDisplay = optionObjects.map(obj => obj.text);
+                    appState.shuffledOptionsMap[appState.currentQuestionIndex] = optionObjects.map(obj => obj.originalIndex);
+                 } else {
+                    const originalLabels = q.lua_chon.map(opt => (opt.match(optionPrefixRegex) || [''])[0]);
+                    const originalContents = q.lua_chon.map(opt => opt.replace(optionPrefixRegex, '').replace(/^\*/, '').trim());
+                    let contentIndices = Array.from({ length: originalContents.length }, (_, i) => i);
+                    contentIndices.sort(() => Math.random() - 0.5);
+                    appState.shuffledOptionsMap[appState.currentQuestionIndex] = contentIndices;
+                    optionsToDisplay = originalLabels.map((label, index) => {
+                        const shuffledContentIndex = contentIndices[index];
+                        const originalOptionWithStar = q.lua_chon.find(opt => opt.replace(optionPrefixRegex, '').replace(/^\*/, '').trim() === originalContents[shuffledContentIndex]);
+                        return originalOptionWithStar || (label + originalContents[shuffledContentIndex]);
+                    });
+                 }
+            }
+
+            let questionHTML = `<div class="question-container" id="q-${appState.currentQuestionIndex}">
+                <p class="question-text">Câu ${appState.currentQuestionIndex + 1}: ${q.cau_hoi ? q.cau_hoi.replace(/\n/g, '<br>') : 'Nội dung không xác định'}</p>
+                <div class="options-container">`;
+            
+            const createOptionHTML = (type, value) => {
+                const cleanText = value.replace(/^\*/, '').trim();
+                return `<label><input type="${type}" name="option-${appState.currentQuestionIndex}" value="${escapeHtml(value)}" class="mr-2"> ${escapeHtml(cleanText)}</label>`;
+            };
+            
+            if (q.type === 'multiple_choice') {
+                optionsToDisplay.forEach(c => questionHTML += createOptionHTML('radio', c));
+            } else if (q.type === 'multiple_answer') {
+                 optionsToDisplay.forEach(c => questionHTML += createOptionHTML('checkbox', c));
+            } else {
+                questionHTML += `<input type="text" id="short-answer-input-${appState.currentQuestionIndex}" placeholder="Nhập câu trả lời..." style="width:100%; padding:10px; font-size:16px;">`;
+            }
+            
+            questionHTML += `</div><div class="feedback"></div>
+                             <button class="btn" style="margin-top:15px;" onclick="checkAnswer()">Trả Lời</button>
+                             </div>`;
+            container.innerHTML = questionHTML;
+        }
+
+        function checkAnswer() {
+            const q = appState.currentQuiz[appState.currentQuestionIndex];
+            const container = document.getElementById(`q-${appState.currentQuestionIndex}`);
+            const inputs = container.querySelectorAll('input');
+            const feedbackDiv = container.querySelector('.feedback');
+
+            const getCleanContent = (text) => {
+                if (!text) return '';
+                return text.replace(optionPrefixRegex, '').replace(/^\*/, '').trim();
+            };
+
+            let isCorrect = false;
+            let selected = [];
+            inputs.forEach(input => input.disabled = true);
+            
+            const cleanCorrectAnswers = q.dap_an_dung.map(ans => getCleanContent(ans));
+
+            if (q.type === 'multiple_choice') {
+                const sel = container.querySelector(`input[type="radio"]:checked`);
+                if (sel) {
+                    selected = [sel.value];
+                    const cleanSelectedContent = getCleanContent(selected[0]);
+                    isCorrect = cleanCorrectAnswers.includes(cleanSelectedContent);
+                }
+            } else if (q.type === 'multiple_answer') {
+                selected = Array.from(container.querySelectorAll(`input[type="checkbox"]:checked`)).map(el => el.value);
+                const cleanSelectedContents = selected.map(s => getCleanContent(s));
+                isCorrect = cleanSelectedContents.length === cleanCorrectAnswers.length && cleanSelectedContents.every(s => cleanCorrectAnswers.includes(s));
+            } else { 
+                const userAnswer = container.querySelector(`#short-answer-input-${appState.currentQuestionIndex}`).value.trim();
+                selected = [userAnswer];
+                isCorrect = q.dap_an_dung.some(ans => ans.toLowerCase() === userAnswer.toLowerCase());
+            }
+
+            appState.userAnswers.push({ questionIndex: appState.currentQuestionIndex, selected, isCorrect });
+
+            if (isCorrect) appState.score++;
+            feedbackDiv.textContent = `${isCorrect ? 'Đúng' : 'Sai'}`;
+            if (!isCorrect) {
+                feedbackDiv.textContent += ` - Đáp án đúng: ${q.dap_an_dung.join(', ')}`;
+            }
+
+            container.querySelectorAll('label').forEach(label => {
+                const input = label.querySelector('input');
+                if (input) {
+                    const isAnswerKey = q.dap_an_dung.some(correct_ans => getCleanContent(correct_ans) === getCleanContent(input.value));
+                    if (isAnswerKey) {
+                        label.style.backgroundColor = '#d4edda';
+                    } else if (input.checked) {
+                        label.style.backgroundColor = '#f8d7da';
+                    }
+                }
+            });
+
+            const button = container.querySelector('button');
+            button.textContent = 'Câu Tiếp Theo';
+            button.onclick = nextQuestion;
+        }
+
+        function nextQuestion() {
+            appState.currentQuestionIndex++;
+            displayQuestion();
+        }
+        function submitEarly() {
+            if (confirm('Bạn có chắc muốn nộp bài sớm không? Các câu chưa làm sẽ coi như sai.')) {
+                showResults();
+            }
+        }
+        function showResults() {
+            appState.isQuizStarted = false;
+            const durationInMs = Date.now() - appState.quizStartTime;
+            document.getElementById('quiz-live-container').innerHTML = '';
+            const resultsContainer = document.getElementById('results-container');
+            resultsContainer.style.display = 'block';
+            const total = appState.currentQuiz.length;
+            document.getElementById('final-score').textContent = `Bạn đã đúng ${appState.score} / ${total} câu!`;
+            
+            saveHistory(appState.userAnswers, appState.score, total, durationInMs)
+                .then(() => {
+                    syncResultsWithFirebase(); // <-- THAY ĐỔI: Cố gắng đồng bộ ngay lập tức
+                });
+
+            document.getElementById('start-btn').textContent = 'Làm Lại';
+            document.getElementById('start-btn').style.display = 'inline-block';
+            document.getElementById('shuffle-btn').style.display = 'inline-block';
+            document.getElementById('submit-early-btn').style.display = 'none';
+        }
+        function toggleShuffle() {
+            appState.isShuffled = !appState.isShuffled;
+            const shuffleText = `Trộn câu hỏi và đáp án: ${appState.isShuffled ? 'Bật' : 'Tắt'}`;
+            document.getElementById('shuffle-btn').textContent = shuffleText;
+            document.getElementById('menu-shuffle-btn').textContent = shuffleText;
+        }
+        let db;
+        function initIndexedDB() {
+            return new Promise((resolve, reject) => {
+                if (db) return resolve(true);
+                const request = indexedDB.open('QuizAppDB', 2);
+                request.onupgradeneeded = function(event) {
+                    db = event.target.result;
+                    if (!db.objectStoreNames.contains('quizStore')) {
+                        db.createObjectStore('quizStore', { keyPath: 'id' });
+                    }
+                };
+                request.onsuccess = function(event) {
+                    db = event.target.result;
+                    resolve(true);
+                };
+                request.onerror = function(event) {
+                    console.error("Lỗi mở IndexedDB: ", event);
+                    reject(false);
+                };
+            });
+        }
+        async function saveToStorage(key, value) {
+            try {
+                const compressed = LZString.compress(JSON.stringify(value));
+                localStorage.setItem(key, compressed);
+            } catch (e) {
+                if (e.name === 'QuotaExceededError') {
+                    console.warn(`LocalStorage quota exceeded for key ${key}. Trying IndexedDB.`);
+                    try {
+                        const compressed = LZString.compress(JSON.stringify(value));
+                        await initIndexedDB();
+                        const transaction = db.transaction(['quizStore'], 'readwrite');
+                        const store = transaction.objectStore('quizStore');
+                        store.put({ id: key, data: compressed });
+                    } catch (dbError) {
+                        console.error(`Failed to save ${key} to IndexedDB:`, dbError);
+                        alert('Không thể lưu dữ liệu. Bộ nhớ đã đầy.');
+                    }
+                } else {
+                    console.error("Lỗi lưu vào localStorage:", e);
+                    alert('Đã xảy ra lỗi khi lưu dữ liệu.');
+                }
+            }
+        }
+
+        async function getFromStorage(key) {
+            try {
+                const localData = localStorage.getItem(key);
+                if (localData) {
+                    const decompressed = LZString.decompress(localData);
+                    if (decompressed) {
+                        return JSON.parse(decompressed);
+                    }
+                    return null;
+                }
+            } catch (e) {
+                console.error(`[Lỗi] Không thể phân tích dữ liệu localStorage cho key '${key}'. Dữ liệu có thể bị hỏng. Lỗi:`, e);
+            }
+            
+            try {
+                await initIndexedDB();
+                return new Promise((resolve) => {
+                    const transaction = db.transaction(['quizStore'], 'readonly');
+                    const store = transaction.objectStore('quizStore');
+                    const request = store.get(key);
+
+                    request.onsuccess = () => {
+                        if (!request.result || !request.result.data) {
+                            return resolve(null);
+                        }
+                        try {
+                            const decompressed = LZString.decompress(request.result.data);
+                            const result = decompressed ? JSON.parse(decompressed) : null;
+                            resolve(result);
+                        } catch (e) {
+                            console.error(`[Lỗi] Không thể phân tích dữ liệu IndexedDB cho key '${key}'. Dữ liệu có thể bị hỏng. Lỗi:`, e);
+                            resolve(null);
+                        }
+                    };
+                    request.onerror = () => {
+                        console.error(`Lỗi khi lấy '${key}' từ IndexedDB.`);
+                        resolve(null);
+                    };
+                });
+            } catch (dbError) {
+                console.error(`Không thể lấy '${key}' từ IndexedDB:`, dbError);
+                return null;
+            }
+        }
+        
+        const historySidebar = document.getElementById('history-sidebar');
+        const historyMainContent = document.getElementById('history-mainContent');
+        let historySidebarVisible = true;
+        function toggleHistorySidebar(show) {
+            historySidebarVisible = show;
+            if (show) {
+                historySidebar.style.transform = "translateX(0)";
+                historyMainContent.classList.remove("full");
+                historyMainContent.classList.add("with-sidebar");
+            } else {
+                historySidebar.style.transform = "translateX(-100%)";
+                historyMainContent.classList.remove("with-sidebar");
+                historyMainContent.classList.add("full");
+            }
+        }
+        
+        async function saveHistory(answers, score, total, durationInMs) {
+            let history = await getFromStorage('quizHistory') || [];
+            if (!Array.isArray(history)) history = [];
+            const entry = {
+                id: Date.now(),
+                user: appState.currentUser,
+                playerID: appState.playerID, // <-- THÊM MỚI: Lưu PlayerID
+                quizTopic: appState.quizTopic,
+                quiz: appState.originalQuizOrder,
+                shuffledQuizMap: appState.shuffledQuizMap,
+                shuffledOptionsMap: appState.shuffledOptionsMap,
+                answers,
+                score,
+                total,
+                durationInMs,
+                isShuffled: appState.isShuffled,
+                date: new Date().toLocaleString('vi-VN'),
+                isSyncedWithFirebase: false // <-- THAY ĐỔI
+            };
+            history.unshift(entry);
+            if (history.length > 50) history.pop();
+            await saveToStorage('quizHistory', history);
+        }
+
+        async function renderHistoryList() {
+            const container = document.getElementById('history-list');
+            container.innerHTML = '';
+            const history = await getFromStorage('quizHistory') || [];
+             if (!Array.isArray(history)) {
+                container.innerHTML = '<p class="text-red-500 p-2">Lỗi đọc dữ liệu lịch sử.</p>';
+                return;
+            }
+            if (history.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 p-2">Chưa có lịch sử làm bài.</p>';
+                return;
+            }
+            history.forEach((entry, index) => {
+                if (!entry || typeof entry.date === 'undefined' || typeof entry.score === 'undefined') {
+                    console.error('Bỏ qua mục lịch sử bị lỗi:', entry);
+                    return;
+                }
+                const colorInfo = pillColorConfig.colors[index % pillColorConfig.colors.length];
+                const btn = document.createElement('button');
+                btn.dataset.id = entry.id;
+                btn.dataset.color = colorInfo.name;
+                const userDisplay = entry.user ? `[${entry.user}] ` : '';
+                btn.textContent = `${userDisplay}${entry.date} (${entry.score}/${entry.total})`;
+                btn.className = `${pillColorConfig.baseClasses} ${colorInfo.classes}`;
+                
+                btn.onclick = () => {
+                    const wasSelected = btn.classList.contains('bg-gray-500');
+
+                    container.querySelectorAll('button').forEach(b => {
+                        const originalColorName = b.dataset.color;
+                        const originalColorInfo = pillColorConfig.colors.find(c => c.name === originalColorName);
+                        if(originalColorInfo) {
+                           b.className = `${pillColorConfig.baseClasses} ${originalColorInfo.classes}`;
+                        }
+                    });
+
+                    const questionBox = document.getElementById('history-questionBox');
+                    questionBox.innerHTML = '';
+                    questionBox.classList.add("hidden");
+
+                    if (!wasSelected) {
+                        btn.className = `${pillColorConfig.baseClasses} ${pillColorConfig.selectedClasses}`;
+
+                        const div = document.createElement("div");
+                        div.className = "p-3 border rounded bg-gray-50";
+                        const userTitle = entry.user ? `của ${entry.user} ` : '';
+                        let content = `<p class="font-bold">Kết quả ${userTitle}ngày ${entry.date} (Điểm: ${entry.score}/${entry.total})</p>
+                                       <button class="btn text-sm p-2 mt-2" onclick="showHistoryContent('${entry.id}')">Xem Chi Tiết</button>`;
+                        if (entry.isShuffled) {
+                            content += `<button class="btn text-sm p-2 mt-2 ml-2" onclick="showComparison(${entry.id})">Xem so sánh</button>`;
+                        }
+                        content += `<button class="btn btn-warning text-sm p-2 mt-2 ml-2" onclick="showStatistics(${entry.id})">Thống kê</button>`;
+                        div.innerHTML = content;
+                        questionBox.appendChild(div);
+                        questionBox.classList.remove("hidden");
+                    }
+                };
+                container.appendChild(btn);
+            });
+        }
+        
+        async function showHistoryContent(hid) {
+            const history = await getFromStorage('quizHistory') || [];
+            const entry = history.find(e => e.id == hid);
+            if (!entry) return;
+            appState.currentModalHistory = entry;
+            const modal = document.getElementById('history-contentModal');
+            const modalTitle = document.getElementById('history-modalTitle');
+            const modalContent = document.getElementById('history-modalContent');
+            
+            const userTitle = entry.user ? `của ${entry.user} ` : '';
+            modalTitle.textContent = `Lịch sử làm bài ${userTitle}: ${entry.date}`;
+            modalContent.innerHTML = `<h4>Điểm: ${entry.score}/${entry.total}</h4>`;
+            
+            const quizData = entry.isShuffled ? entry.shuffledQuizMap.map(i => entry.quiz[i]) : entry.quiz;
+            
+            quizData.forEach((q, index) => {
+                const userAnswerEntry = entry.answers.find(a => a.questionIndex === index) || { selected: [], isCorrect: false };
+                let contentHTML = `<div style="margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #eee;"><p><strong>Câu ${index + 1}:</strong> ${q.cau_hoi ? q.cau_hoi.replace(/\n/g, '<br>') : 'Nội dung không xác định'}</p>`;
+                
+                const originalQuestionIndex = entry.isShuffled ? entry.shuffledQuizMap[index] : index;
+                const correctAnswers = entry.quiz[originalQuestionIndex].dap_an_dung;
+
+                if (q.lua_chon && q.lua_chon.length > 0) {
+                     const getCleanContent = (text) => {
+                        if (!text) return '';
+                        return text.replace(optionPrefixRegex, '').replace(/^\*/, '').trim();
+                    };
+
+                    contentHTML += '<ul>' + q.lua_chon.map(c => {
+                        const isAnswerKey = correctAnswers.some(ans => getCleanContent(ans) === getCleanContent(c));
+                        const isSelected = userAnswerEntry.selected.some(sel => getCleanContent(sel) === getCleanContent(c));
+                        
+                        let style = '';
+                        if (isSelected) {
+                            style = isAnswerKey 
+                                ? 'color: var(--success-color); font-weight: bold;'
+                                : 'color: var(--danger-color);';
+                        } else if (isAnswerKey) {
+                            style = 'color: var(--success-color); text-decoration: underline;';
+                        }
+                        
+                        return `<li style="${style}">${c}</li>`;
+                    }).join('') + '</ul>';
+                }
+
+                contentHTML += `<p>Câu trả lời của bạn: <strong>${userAnswerEntry.selected.join(', ') || 'Chưa trả lời'}</strong> - <strong style="color:${userAnswerEntry.isCorrect ? 'var(--success-color)' : 'var(--danger-color)'};">${userAnswerEntry.isCorrect ? 'Đúng' : 'Sai'}</strong></p>`;
+                if (!userAnswerEntry.isCorrect) {
+                     contentHTML += `<p style="color: var(--success-color);"><em>Đáp án đúng: ${correctAnswers.join(', ')}</em></p>`;
+                }
+                modalContent.innerHTML += contentHTML + '</div>';
+            });
+            document.getElementById('deleteHistoryBtn').onclick = () => deleteHistory(hid);
+            modal.style.display = 'block';
+        }
+        
+        function showStatistics(hid) {
+            ensureLibraryIsLoaded('apexChartsLibraryCode_v2', 'https://cdn.jsdelivr.net/npm/apexcharts', 'ApexCharts', async () => {
+                try {
+                    const history = await getFromStorage('quizHistory') || [];
+                    const entry = history.find(e => e.id == hid);
+                    if (!entry) {
+                        alert("Lỗi: Không tìm thấy lịch sử làm bài.");
+                        return;
+                    }
+                
+                    const modal = document.getElementById('statisticsModal');
+                    const modalTitle = document.getElementById('statistics-modalTitle');
+                    const legendContent = document.getElementById('statistics-legend');
+                    
+                    const correctCount = entry.score;
+                    const answeredCount = entry.answers.length;
+                    const incorrectCount = answeredCount - correctCount;
+                    const unansweredCount = entry.total - answeredCount;
+                    const correctPercentage = entry.total > 0 ? ((correctCount / entry.total) * 100).toFixed(1) : 0;
+                    
+                    const quizSignature = JSON.stringify(entry.quiz.map(q => q.cau_hoi).sort());
+                    const quizAttempts = history.filter(h => JSON.stringify(h.quiz.map(q => q.cau_hoi).sort()) === quizSignature).length;
+                    
+                    const userTitle = entry.user ? `của ${entry.user} ` : '';
+                    modalTitle.textContent = `Thống kê ${userTitle}: ${entry.date}`;
+                
+                    legendContent.innerHTML = `
+                        <p><strong>Kết quả:</strong> 
+                            <span style="color:var(--success-color)">${correctCount} Đúng</span> / 
+                            <span style="color:var(--danger-color)">${incorrectCount} Sai</span> / 
+                            <span style="color:var(--secondary-color)">${unansweredCount} Chưa làm</span>
+                            (trên tổng ${entry.total} câu).
+                        </p>
+                        <p><strong>Tỉ lệ đúng:</strong> ${correctPercentage}%</p>
+                        <p><strong>Số lần làm bài này (tổng cộng):</strong> ${quizAttempts}</p>
+                    `;
+                    
+                    const chartEl = document.querySelector("#statistics-chart");
+                    if(window.statisticsChart) {
+                        window.statisticsChart.destroy();
+                    }
+
+                    const seriesData = [correctCount, incorrectCount, unansweredCount];
+                    const labelsData = ['Đúng', 'Sai', 'Chưa làm'];
+                    const colorsData = [
+                        getComputedStyle(document.documentElement).getPropertyValue('--success-color').trim(), 
+                        getComputedStyle(document.documentElement).getPropertyValue('--danger-color').trim(),
+                        getComputedStyle(document.documentElement).getPropertyValue('--secondary-color').trim()
+                    ];
+
+                    const options = {
+                        chart: { type: 'pie', height: 320, animations: { enabled: true } },
+                        series: seriesData,
+                        labels: labelsData,
+                        colors: colorsData,
+                        legend: { position: 'bottom' },
+                        tooltip: { y: { formatter: (val) => val + " câu" } },
+                        dataLabels: {
+                            formatter: (val, opts) => {
+                                 const total = opts.w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                                if (opts.w.globals.series[opts.seriesIndex] === 0 || total === 0) return '';
+                                const percent = ((opts.w.globals.series[opts.seriesIndex] / total) * 100).toFixed(0) + '%';
+                                return percent;
+                            },
+                            style: { colors: ['#fff'] },
+                            dropShadow: { enabled: true, top: 1, left: 1, blur: 1, opacity: 0.5 }
+                        }
+                    };
+                    
+                    if (correctCount === 0 && incorrectCount === 0 && unansweredCount === 0) {
+                        options.series = [1];
+                        options.labels = ['Chưa có dữ liệu'];
+                        options.colors = ['#B0B0B0'];
+                    }
+
+                    window.statisticsChart = new ApexCharts(chartEl, options);
+                    window.statisticsChart.render();
+                    
+                    modal.style.display = 'block';
+                
+                    document.getElementById('statistics-close-btn').onclick = () => {
+                        modal.style.display = 'none';
+                    };
+                } catch (e) {
+                    console.error("Error in showStatistics:", e);
+                    alert("Đã xảy ra lỗi khi hiển thị thống kê: " + e.message);
+                }
+            });
+        }
+        
+        let largeSearchMatches = [];
+        let currentMatchIndex = -1;
+
+        async function showComparison(hid) {
+            const history = await getFromStorage('quizHistory') || [];
+            const entry = history.find(e => e.id == hid);
+            if (!entry || !entry.isShuffled) {
+                alert("Lỗi: Không tìm thấy lịch sử hoặc đây không phải là bài thi đã được xáo trộn.");
+                return;
+            }
+
+            const modal = document.getElementById('comparisonModal');
+            const modalTitle = document.getElementById('comparison-modalTitle');
+            const comparisonContainer = document.getElementById('comparison-content');
+            
+            const fragment = document.createDocumentFragment();
+            const lightColors = ['#D4EDDA', '#FFF3CD', '#D1ECF1', '#F8D7DA', '#E2E3E5', '#CCE5FF'];
+
+            entry.shuffledQuizMap.forEach((originalIndex, shuffledIndex) => {
+                const originalQ = entry.quiz[originalIndex];
+                const userAnswerEntry = entry.answers.find(a => a.questionIndex === shuffledIndex);
+
+                const questionBlock = document.createElement('div');
+                questionBlock.className = 'comparison-question';
+                questionBlock.id = `comp-q-shuffled-${shuffledIndex + 1}`;
+                questionBlock.dataset.originalIndex = originalIndex + 1;
+                
+                let questionBlockHTML = `<h4 style="text-align:center; color: #0056b3; font-weight: bold;">Câu gốc ${originalIndex + 1} &rArr; Câu xáo trộn ${shuffledIndex + 1}</h4>
+                    <p class="comparison-question-text">${originalQ.cau_hoi.replace(/\n/g, '<br>')}</p>`;
+
+                if (originalQ.type === 'short_answer') {
+                    const correctAnswer = originalQ.dap_an_dung.join(', ');
+                    let userAnswerHTML = '<em>(Chưa trả lời)</em>';
+                    if (userAnswerEntry && userAnswerEntry.selected.length > 0 && userAnswerEntry.selected[0]) {
+                        const userAnswer = userAnswerEntry.selected[0];
+                        const userAnswerColor = userAnswerEntry.isCorrect ? 'var(--success-color)' : 'var(--danger-color)';
+                        userAnswerHTML = `<strong style="color: ${userAnswerColor};">${userAnswer}</strong>`;
+                    }
+                    questionBlockHTML += `<div style="text-align:center; padding:10px; background-color:#f0f0f0; border-radius:8px;">
+                                            <p>Đáp án đúng: <strong style="color: var(--success-color);">${correctAnswer}</strong></p>
+                                            <p>Bạn đã trả lời: ${userAnswerHTML}</p>
+                                         </div>`;
+                } else {
+                    questionBlockHTML += `<div class="options-comparison-wrapper">`;
+                    
+                    questionBlockHTML += `<div class="options-column"><h5>Đề gốc</h5>`;
+                    originalQ.lua_chon.forEach((opt, idx) => {
+                        const isCorrect = originalQ.dap_an_dung.includes(opt);
+                        const style = isCorrect ? 'color: var(--success-color); font-weight: bold;' : 'color: var(--text-color);';
+                        const color = lightColors[idx % lightColors.length];
+                        questionBlockHTML += `<div class="option-item" style="background-color: ${color};"><span style="${style}">${opt}</span></div>`;
+                    });
+                    questionBlockHTML += `</div>`;
+                    
+                    questionBlockHTML += `<div class="options-column"><h5>Bạn làm</h5>`;
+                    const shuffledContentIndices = entry.shuffledOptionsMap[shuffledIndex] || [];
+                    const userSelectedOptions = userAnswerEntry ? userAnswerEntry.selected : [];
+
+                    if (Array.isArray(originalQ.lua_chon) && originalQ.lua_chon.length > 0) {
+                        const getCleanContent = (text) => {
+                           if (!text) return '';
+                           if(originalQ.hasLineMarker) return text.replace(/^\*/, '').trim();
+                           return text.replace(optionPrefixRegex, '').replace(/\*/g, '').trim();
+                        };
+                        
+                         if (originalQ.hasLineMarker) {
+                             const originalOptionObjects = originalQ.lua_chon.map((opt, index) => ({ text: opt, originalIndex: index }));
+                             const shuffledOriginalIndices = shuffledContentIndices.length > 0 ? shuffledContentIndices : originalOptionObjects.map(o => o.originalIndex);
+                             
+                             shuffledOriginalIndices.forEach(originalContentIndex => {
+                                 const originalOptionString = originalOptionObjects[originalContentIndex].text;
+                                 const isThisOptionCorrect = originalQ.dap_an_dung.includes(originalOptionString);
+                                 const wasThisOptionSelected = userSelectedOptions.includes(originalOptionString);
+                                 const color = lightColors[originalContentIndex % lightColors.length];
+                                 
+                                 let finalStyle = '';
+                                 if (wasThisOptionSelected) {
+                                     finalStyle = isThisOptionCorrect ? 'color: var(--success-color); font-weight: bold;' : 'color: var(--danger-color);';
+                                 } else if (isThisOptionCorrect) {
+                                     finalStyle = 'color: var(--success-color); text-decoration: underline;';
+                                 } else {
+                                     finalStyle = 'color: var(--text-color);';
+                                 }
+                                 
+                                 questionBlockHTML += `<div class="option-item" style="background-color: ${color};"><span style="${finalStyle}">${originalOptionString}</span></div>`;
+                             });
+                         } else {
+                            if (shuffledContentIndices.length > 0) {
+                                const originalLabels = originalQ.lua_chon.map(opt => (opt.match(optionPrefixRegex) || [''])[0]);
+                                const originalContents = originalQ.lua_chon.map(opt => getCleanContent(opt));
+
+                                originalLabels.forEach((label, newIndex) => {
+                                    const originalContentIndex = shuffledContentIndices[newIndex];
+                                    if (originalContentIndex === undefined) return;
+
+                                    const originalOptionString = originalQ.lua_chon[originalContentIndex];
+                                    const fullShuffledOption = label + originalContents[originalContentIndex];
+                                    
+                                    const isThisOptionCorrect = originalQ.dap_an_dung.includes(originalOptionString);
+                                    const wasThisOptionSelected = userSelectedOptions.includes(fullShuffledOption);
+                                    const color = lightColors[originalContentIndex % lightColors.length];
+                                    
+                                    let finalStyle = '';
+                                    if (wasThisOptionSelected) {
+                                        finalStyle = isThisOptionCorrect ? 'color: var(--success-color); font-weight: bold;' : 'color: var(--danger-color);';
+                                    } else if (isThisOptionCorrect) {
+                                        finalStyle = 'color: var(--success-color); text-decoration: underline;';
+                                    }
+                                    
+                                    questionBlockHTML += `<div class="option-item" style="background-color: ${color};"><span style="${finalStyle}">${fullShuffledOption}</span></div>`;
+                                });
+                            }
+                        }
+                    } else {
+                         questionBlockHTML += `<p class="text-center text-gray-500 p-4">Không có dữ liệu đáp án cho câu này.</p>`;
+                    }
+                    questionBlockHTML += `</div></div>`;
+                }
+                
+                questionBlock.innerHTML = questionBlockHTML;
+                fragment.appendChild(questionBlock);
+            });
+
+            comparisonContainer.innerHTML = '';
+            comparisonContainer.appendChild(fragment);
+
+            modalTitle.textContent = `So sánh đề gốc và đề đã xáo trộn: ${entry.date}`;
+            modal.style.display = 'block';
+            document.getElementById('comparison-menu-btn').style.display = 'flex';
+            document.getElementById('comparison-help-btn').style.display = 'flex';
+        }
+        
+        function closeComparisonModal() {
+            document.getElementById('comparisonModal').style.display = 'none';
+            document.getElementById('comparison-menu-btn').style.display = 'none';
+            document.getElementById('comparison-help-btn').style.display = 'none'; 
+            document.getElementById('helpModal').style.display = 'none'; 
+            closeAllMenus();
+            clearLargeSearch();
+        }
+
+        // ==================================================================
+        // =================== SỬA LỖI MENU TÌM KIẾM =======================
+        // ==================================================================
+        function initComparisonMenuListeners() {
+            const menuBtn = document.getElementById('comparison-menu-btn');
+            const smallMenu = document.getElementById('small-search-menu');
+            const largeMenu = document.getElementById('large-search-menu');
+            const modalContent = document.querySelector('#comparisonModal .modal-content');
+            
+            let pressTimer = null;
+            let longPressTriggered = false; // <-- BIẾN CỜ MỚI
+
+            const startPress = (e) => {
+                e.preventDefault();
+                longPressTriggered = false; // Reset cờ mỗi khi bắt đầu nhấn
+                
+                pressTimer = setTimeout(() => {
+                    longPressTriggered = true; // Đặt cờ: Báo hiệu nhấn giữ đã thành công
+                    closeAllMenus();
+                    largeMenu.classList.add('open');
+                    modalContent.classList.add('large-search-open');
+                }, 500);
+            };
+
+            const endPress = (e) => {
+                e.preventDefault();
+                clearTimeout(pressTimer); // Luôn xóa bộ đếm khi thả tay
+
+                if (longPressTriggered) {
+                    return; 
+                }
+
+                if (largeMenu.classList.contains('open')) {
+                    closeAllMenus();
+                } else {
+                    smallMenu.classList.toggle('open');
+                }
+            };
+            
+            menuBtn.addEventListener('mousedown', startPress);
+            menuBtn.addEventListener('mouseup', endPress);
+            menuBtn.addEventListener('mouseleave', () => {
+                clearTimeout(pressTimer);
+            });
+            menuBtn.addEventListener('touchstart', startPress, { passive: false });
+            menuBtn.addEventListener('touchend', endPress);
+
+            document.getElementById('clear-small-search').addEventListener('click', () => {
+                document.getElementById('dao-input').value = '';
+                document.getElementById('thuan-input').value = '';
+            });
+            document.getElementById('exec-small-search').addEventListener('click', execSmallSearch);
+
+            document.getElementById('clear-large-search').addEventListener('click', () => {
+                document.getElementById('large-search-input').value = '';
+                clearLargeSearch();
+            });
+            document.getElementById('exec-large-search').addEventListener('click', execLargeSearch);
+            document.getElementById('prev-match-btn').addEventListener('click', () => navigateMatches(-1));
+            document.getElementById('next-match-btn').addEventListener('click', () => navigateMatches(1));
+        }
+        
+        function closeAllMenus() {
+            document.getElementById('small-search-menu').classList.remove('open');
+            const largeMenu = document.getElementById('large-search-menu');
+            if (largeMenu.classList.contains('open')) {
+                largeMenu.classList.remove('open');
+                document.querySelector('#comparisonModal .modal-content').classList.remove('large-search-open');
+            }
+        }
+
+        function execSmallSearch() {
+            const daoInput = document.getElementById('dao-input');
+            const thuanInput = document.getElementById('thuan-input');
+            const daoValue = daoInput.value;
+            const thuanValue = thuanInput.value;
+
+            if (daoValue && thuanValue) {
+                alert('Chỉ nhập 1 dòng thôi!');
+                return;
+            }
+
+            let targetElement = null;
+            if (daoValue) {
+                targetElement = document.getElementById(`comp-q-shuffled-${daoValue}`);
+            } else if (thuanValue) {
+                targetElement = document.querySelector(`.comparison-question[data-original-index='${thuanValue}']`);
+            }
+
+            if (targetElement) {
+                targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                targetElement.style.transition = 'background-color 0.5s';
+                targetElement.style.backgroundColor = 'rgba(255, 255, 0, 0.3)';
+                setTimeout(() => { targetElement.style.backgroundColor = ''; }, 1500);
+            } else {
+                if(daoValue || thuanValue) alert('Câu không tồn tại!');
+            }
+        }
+
+        function clearLargeSearch() {
+            document.getElementById('large-search-results').textContent = '';
+            document.getElementById('prev-match-btn').style.display = 'none';
+            document.getElementById('next-match-btn').style.display = 'none';
+            largeSearchMatches.forEach(match => {
+                if (match.element) {
+                   match.element.innerHTML = match.originalHTML;
+                }
+            });
+            largeSearchMatches = [];
+            currentMatchIndex = -1;
+        }
+        
+        function execLargeSearch() {
+            const searchText = document.getElementById('large-search-input').value.trim();
+            const resultsDiv = document.getElementById('large-search-results');
+            
+            clearLargeSearch();
+            
+            if (searchText.length < 2) {
+                resultsDiv.textContent = 'Vui lòng nhập ít nhất 2 ký tự.';
+                return;
+            }
+
+            resultsDiv.textContent = 'Đang tìm kiếm...';
+
+            setTimeout(() => {
+                const regex = new RegExp(searchText.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
+                const allQuestionBlocks = document.querySelectorAll('.comparison-question');
+                let totalMatchCount = 0;
+
+                allQuestionBlocks.forEach(qBlock => {
+                    if (qBlock.textContent.toLowerCase().includes(searchText.toLowerCase())) {
+                        const occurrences = (qBlock.textContent.match(regex) || []).length;
+                        
+                        if (occurrences > 0) {
+                            totalMatchCount += occurrences;
+                            const originalHTML = qBlock.innerHTML;
+                            const newHTML = qBlock.innerHTML.replace(regex, (match) => `<mark>${match}</mark>`);
+                            largeSearchMatches.push({ element: qBlock, originalHTML: originalHTML });
+                            qBlock.innerHTML = newHTML;
+                        }
+                    }
+                });
+                
+                if (largeSearchMatches.length > 0) {
+                    resultsDiv.textContent = `Tìm thấy ${totalMatchCount} kết quả trong ${largeSearchMatches.length} câu.`;
+                    document.getElementById('prev-match-btn').style.display = 'inline-block';
+                    document.getElementById('next-match-btn').style.display = 'inline-block';
+                    currentMatchIndex = 0;
+                    scrollToMatch(currentMatchIndex);
+                } else {
+                    resultsDiv.textContent = 'Không tìm thấy kết quả nào.';
+                }
+            }, 10);
+        }
+        
+        function navigateMatches(direction) {
+            if (largeSearchMatches.length === 0) return;
+            const newIndex = currentMatchIndex + direction;
+            if (newIndex >= 0 && newIndex < largeSearchMatches.length) {
+                largeSearchMatches[currentMatchIndex].element.querySelector('mark')?.classList.remove('current-match');
+                currentMatchIndex = newIndex;
+                scrollToMatch(currentMatchIndex);
+            }
+        }
+
+        function scrollToMatch(index) {
+            const targetElement = largeSearchMatches[index].element;
+            const allMarks = document.querySelectorAll('mark.current-match');
+            allMarks.forEach(m => m.classList.remove('current-match'));
+            
+            const firstMarkInElement = targetElement.querySelector('mark');
+            if (firstMarkInElement) {
+                firstMarkInElement.classList.add('current-match');
+            }
+            
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function closeHistoryModal() {
+            document.getElementById('history-contentModal').style.display = 'none';
+        }
+        function deleteHistoryFromModal() {
+            if (appState.currentModalHistory) {
+                deleteHistory(appState.currentModalHistory.id);
+            }
+        }
+        async function deleteHistory(hid) {
+            if (confirm(`Bạn có chắc muốn xóa lịch sử này không?`)) {
+                let history = await getFromStorage('quizHistory') || [];
+                history = history.filter(entry => entry.id != hid);
+                await saveToStorage('quizHistory', history);
+                closeHistoryModal();
+                renderHistoryList();
+                document.getElementById('history-questionBox').innerHTML = '';
+                document.getElementById('history-questionBox').classList.add("hidden");
+                alert('Đã xóa lịch sử!');
+            }
+        }
+        
+        // ==================================================================
+        // =================== HỆ THỐNG ĐỒNG BỘ FIREBASE ====================
+        // ==================================================================
+        let isSyncing = false;
+        function showSyncStatus(message, type = 'syncing', duration = 3000) {
+            const statusDiv = document.getElementById('sync-status');
+            if (!statusDiv) return;
+            statusDiv.textContent = message;
+            statusDiv.className = type;
+            statusDiv.style.display = 'block';
+
+            if (type !== 'syncing') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, duration);
+            }
+        }
+
+        async function sendSingleResultToFirebase(entry) {
+            const { ref, get, set, serverTimestamp, db } = window.firebaseSDK;
+            try {
+                const { playerID, user, score, total, durationInMs, quizTopic } = entry;
+                if (!playerID) {
+                    console.error("Bỏ qua đồng bộ: Không tìm thấy PlayerID trong entry.");
+                    return true; // Coi như thành công để không thử lại entry lỗi này
+                }
+                const timeInSeconds = Math.round(durationInMs / 1000);
+
+                const accuracy = (total > 0) ? (score / total) : 0;
+                const newRankingScore = (accuracy >= 0.6) ? (score * 1000) - timeInSeconds : (score * 1000);
+                const newOfficialScore = (total > 0) ? parseFloat(((score / total) * 10).toFixed(2)) : 0;
+
+                const playerRef = ref(db, 'leaderboard/' + playerID);
+                const snapshot = await get(playerRef);
+                const oldRankingScore = snapshot.exists() ? (snapshot.val().rankingScore || -1) : -1;
+
+                if (newRankingScore > oldRankingScore) {
+                    const dataToSave = {
+                        playerID: playerID,
+                        playerName: user,
+                        rankingScore: newRankingScore,
+                        officialScore: newOfficialScore,
+                        timeInSeconds: timeInSeconds,
+                        submissionTimestamp: serverTimestamp(),
+                        quizName: quizTopic,
+                        correctAnswers: score,
+                        totalQuestions: total
+                    };
+                    await set(playerRef, dataToSave);
+                    console.log(`Gửi thành công kết quả của ID ${entry.id} lên Firebase.`);
+                } else {
+                    console.log(`Bỏ qua kết quả của ID ${entry.id} vì điểm không cao hơn.`);
+                }
+                
+                return true;
+            } catch (error) {
+                console.error(`Lỗi khi đồng bộ ID ${entry.id} lên Firebase:`, error);
+                return false;
+            }
+        }
+
+        async function syncResultsWithFirebase() {
+            if (isSyncing || !navigator.onLine) return;
+            isSyncing = true;
+            showSyncStatus('Đang đồng bộ kết quả với bảng xếp hạng...', 'syncing');
+
+            let history = await getFromStorage('quizHistory') || [];
+            const pendingEntries = history.filter(entry => !entry.isSyncedWithFirebase);
+
+            if (pendingEntries.length === 0) {
+                isSyncing = false;
+                document.getElementById('sync-status').style.display = 'none';
+                return;
+            }
+
+            let hasChanged = false;
+            let successCount = 0;
+            for (const entry of pendingEntries) {
+                if (!entry.playerID) entry.playerID = localStorage.getItem('quizAppPlayerID');
+
+                const success = await sendSingleResultToFirebase(entry);
+                if (success) {
+                    entry.isSyncedWithFirebase = true;
+                    hasChanged = true;
+                    successCount++;
+                }
+            }
+
+            if (hasChanged) {
+                await saveToStorage('quizHistory', history);
+            }
+            
+            if (successCount > 0) {
+                showSyncStatus(`Đồng bộ thành công ${successCount}/${pendingEntries.length} kết quả!`, 'success');
+            } else if (pendingEntries.length > 0) {
+                showSyncStatus('Đồng bộ thất bại, sẽ thử lại sau.', 'error');
+            }
+
+            isSyncing = false;
+        }
+
+    </script>
+</body>
+</html>
